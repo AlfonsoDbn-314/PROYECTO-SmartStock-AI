@@ -231,11 +231,20 @@ function diasRestantes(fechaISO: string): number {
   return Math.round((f.getTime() - hoy.getTime()) / 86400000);
 }
 
+function mesesRestantes(fechaISO: string): number {
+  return Math.round(diasRestantes(fechaISO) / 30);
+}
+
+function textoMeses(fechaISO: string): string {
+  const m = Math.abs(mesesRestantes(fechaISO));
+  return m === 0 ? "<1 mes" : m === 1 ? "1 mes" : `${m} meses`;
+}
+
 function BadgeCaducidad({ fechaISO }: { fechaISO: string }) {
   const d = diasRestantes(fechaISO);
   if (d < 0) return <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Caducado</span>;
-  if (d <= 30) return <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">{d}d</span>;
-  return <span className="text-xs text-slate-500">{fechaISO}</span>;
+  if (d <= 30) return <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">{textoMeses(fechaISO)}</span>;
+  return <span className="text-xs text-slate-500">{textoMeses(fechaISO)}</span>;
 }
 
 function TablaMedicamentos({ medicamentos }: { medicamentos: Medicamento[] }) {
@@ -439,7 +448,7 @@ function PanelCaducidad({ lotes, nombreMed }: { lotes: Lote[]; nombreMed: (id: s
                 <div className="font-medium text-sm">{nombreMed(l.medicamentoId)?.nombre ?? l.medicamentoId}</div>
                 <div className="text-xs text-slate-500 font-mono">{l.numeroLote} · {l.bodegaCodigo}</div>
               </div>
-              <div className="text-amber-600 font-bold text-xs">{diasRestantes(l.fechaCaducidad)}d</div>
+              <div className="text-amber-600 font-bold text-xs">{textoMeses(l.fechaCaducidad)}</div>
             </li>
           ))}
         </ul>
