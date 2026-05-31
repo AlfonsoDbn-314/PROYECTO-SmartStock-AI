@@ -43,7 +43,11 @@ _SINONIMOS = {
     "vencimiento": "caducidad", "vencido": "caducado", "vencidos": "caducado",
     "expira": "caducar", "expiracion": "caducidad", "caduca": "caducar",
     "reponer": "reabastecer", "abastecer": "reabastecer",
-    "agotado": "stock", "agotarse": "stock", "almacen": "bodega",
+    "agotado": "stock", "agotarse": "stock", "agotandose": "stock",
+    "riesgo": "stock", "riesgos": "stock", "critico": "stock",
+    "críticos": "stock", "criticos": "stock", "crítico": "stock",
+    "faltante": "stock", "faltantes": "stock", "escasez": "stock",
+    "almacen": "bodega",
     "durara": "durar", "durará": "durar", "dura": "durar",
 }
 

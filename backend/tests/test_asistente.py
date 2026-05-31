@@ -57,6 +57,15 @@ def test_disponibilidad_por_nombre(tmp_path) -> None:
     assert "No" in no.respuesta and "dexketoprofeno" in no.respuesta
 
 
+def test_pregunta_en_riesgo(tmp_path) -> None:
+    # Con stock_minimo 10 y solo 5 uds en lotes vigentes, está en riesgo.
+    a = AsistenteLocal(_vault(tmp_path), proveedor_inventario=_snapshot)
+    r = a.consultar("dime lo que está en riesgo")
+    assert r.fuentes == ["inventario"]
+    # Dispara la intención de stock (aquí no hay nada bajo mínimo).
+    assert "mínimo" in r.respuesta.lower()
+
+
 def test_pregunta_por_bodega(tmp_path) -> None:
     a = AsistenteLocal(_vault(tmp_path), proveedor_inventario=_snapshot)
     r = a.consultar("¿qué hay en la bodega central?")
