@@ -122,10 +122,16 @@ class AsistenteLocal(Asistente):
         return med_id
 
     def _linea_lote(self, snap: InventarioSnapshot, lote: Lote, hoy: date) -> str:
+        dias = dias_para_caducar(lote, hoy)
+        if dias < 0:
+            cad = f"caducó el {lote.fecha_caducidad} (hace {-dias} días)"
+        elif dias == 0:
+            cad = f"caduca hoy ({lote.fecha_caducidad})"
+        else:
+            cad = f"caduca el {lote.fecha_caducidad} (en {dias} días)"
         return (
             f"{self._nombre_med(snap, lote.medicamento_id)} · lote {lote.numero_lote} "
-            f"· bodega {lote.bodega_codigo} · {lote.stock_actual} uds · "
-            f"caduca {lote.fecha_caducidad} (en {dias_para_caducar(lote, hoy)} días)"
+            f"· bodega {lote.bodega_codigo} · {lote.stock_actual} uds · {cad}"
         )
 
     # --- Respuestas deterministas -----------------------------------------
