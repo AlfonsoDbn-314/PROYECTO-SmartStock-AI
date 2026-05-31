@@ -36,7 +36,7 @@ _VACIAS = {
     "de", "la", "el", "los", "las", "un", "una", "y", "o", "que", "en", "a",
     "del", "se", "por", "con", "para", "su", "al", "lo", "como", "es", "son",
     "qué", "cuál", "cuáles", "debo", "debería", "hay", "mi", "me", "está",
-    "están", "cuándo", "dónde", "va", "ser", "del",
+    "están", "cuándo", "va", "ser", "del",
 }
 _SINONIMOS = {
     "vencer": "caducar", "vence": "caducar", "vencerse": "caducar",
