@@ -1,11 +1,11 @@
-"""Caso de uso: dar de alta un medicamento."""
+"""Caso de uso: dar de alta un medicamento en el catálogo."""
 from __future__ import annotations
 
 import uuid
 from typing import Callable
 
 from app.domain.entities import Medicamento
-from app.domain.ports import MedicamentoRepository
+from app.domain.ports import InventarioRepository
 
 from .comandos import CrearMedicamentoCmd
 
@@ -21,14 +21,14 @@ class SkuDuplicadoError(Exception):
 class CrearMedicamento:
     def __init__(
         self,
-        repo: MedicamentoRepository,
+        repo: InventarioRepository,
         id_factory: Callable[[], str] = lambda: str(uuid.uuid4()),
     ) -> None:
         self._repo = repo
         self._id_factory = id_factory
 
     def ejecutar(self, cmd: CrearMedicamentoCmd) -> Medicamento:
-        if self._repo.obtener_por_sku(cmd.sku) is not None:
+        if self._repo.obtener_medicamento_por_sku(cmd.sku) is not None:
             raise SkuDuplicadoError(cmd.sku)
 
         medicamento = Medicamento(
@@ -36,8 +36,6 @@ class CrearMedicamento:
             sku=cmd.sku,
             nombre=cmd.nombre,
             categoria=cmd.categoria,
-            fecha_caducidad=cmd.fecha_caducidad,
-            stock_actual=cmd.stock_inicial,
             stock_minimo=cmd.stock_minimo,
         )
-        return self._repo.guardar(medicamento)
+        return self._repo.guardar_medicamento(medicamento)

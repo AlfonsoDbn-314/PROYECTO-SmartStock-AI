@@ -1,44 +1,39 @@
-"""Reglas de negocio puras sobre la caducidad de los medicamentos."""
+"""Reglas de negocio puras sobre la caducidad de los lotes."""
 from __future__ import annotations
 
 from datetime import date
 
-from .entities import Medicamento
+from .entities import Lote
 
-# Umbral por defecto para considerar un medicamento "próximo a caducar".
+# Umbral por defecto para considerar un lote "próximo a caducar".
 DIAS_AVISO_CADUCIDAD = 30
 
 
-def dias_para_caducar(medicamento: Medicamento, hoy: date) -> int:
+def dias_para_caducar(lote: Lote, hoy: date) -> int:
     """Días que faltan para la caducidad (negativo si ya caducó)."""
-    return (medicamento.fecha_caducidad - hoy).days
+    return (lote.fecha_caducidad - hoy).days
 
 
-def esta_caducado(medicamento: Medicamento, hoy: date) -> bool:
-    """El medicamento ya pasó su fecha de caducidad."""
-    return medicamento.fecha_caducidad < hoy
+def esta_caducado(lote: Lote, hoy: date) -> bool:
+    """El lote ya pasó su fecha de caducidad."""
+    return lote.fecha_caducidad < hoy
 
 
-def proximo_a_caducar(
-    medicamento: Medicamento, hoy: date, dias_aviso: int = DIAS_AVISO_CADUCIDAD
-) -> bool:
+def proximo_a_caducar(lote: Lote, hoy: date, dias_aviso: int = DIAS_AVISO_CADUCIDAD) -> bool:
     """Aún no caduca pero lo hará dentro del umbral de aviso (en días)."""
-    dias = dias_para_caducar(medicamento, hoy)
+    dias = dias_para_caducar(lote, hoy)
     return 0 <= dias <= dias_aviso
 
 
-def medicamentos_caducados(
-    medicamentos: list[Medicamento], hoy: date
-) -> list[Medicamento]:
-    """Filtra los medicamentos ya caducados."""
-    return [m for m in medicamentos if esta_caducado(m, hoy)]
+def lotes_caducados(lotes: list[Lote], hoy: date) -> list[Lote]:
+    """Filtra los lotes ya caducados, ordenados por fecha."""
+    caducados = [lote for lote in lotes if esta_caducado(lote, hoy)]
+    return sorted(caducados, key=lambda x: x.fecha_caducidad)
 
 
-def medicamentos_proximos_a_caducar(
-    medicamentos: list[Medicamento],
-    hoy: date,
-    dias_aviso: int = DIAS_AVISO_CADUCIDAD,
-) -> list[Medicamento]:
-    """Filtra los medicamentos próximos a caducar, ordenados por fecha."""
-    proximos = [m for m in medicamentos if proximo_a_caducar(m, hoy, dias_aviso)]
-    return sorted(proximos, key=lambda m: m.fecha_caducidad)
+def lotes_proximos_a_caducar(
+    lotes: list[Lote], hoy: date, dias_aviso: int = DIAS_AVISO_CADUCIDAD
+) -> list[Lote]:
+    """Filtra los lotes próximos a caducar, ordenados por fecha (FEFO)."""
+    proximos = [lote for lote in lotes if proximo_a_caducar(lote, hoy, dias_aviso)]
+    return sorted(proximos, key=lambda x: x.fecha_caducidad)

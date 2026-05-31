@@ -1,30 +1,54 @@
 // Cliente del backend SmartStock. Usa el proxy /api → http://localhost:8080.
 
+export interface Bodega {
+  codigo: string;
+  nombre: string;
+  ubicacion: string;
+}
+
 export interface Medicamento {
   id: string;
   sku: string;
   nombre: string;
   categoria: string;
+  stockMinimo: number;
+  stockTotal: number;
+  numLotes: number;
+  bajoStock: boolean;
+}
+
+export interface Lote {
+  id: string;
+  medicamentoId: string;
+  numeroLote: string;
+  bodegaCodigo: string;
   fechaCaducidad: string; // ISO YYYY-MM-DD
   stockActual: number;
+}
+
+export interface MedEnRiesgo {
+  sku: string;
+  nombre: string;
+  categoria: string;
+  stockTotal: number;
   stockMinimo: number;
-  bajoStock: boolean;
 }
 
 export interface Reporte {
   totalMedicamentos: number;
+  totalLotes: number;
   totalUnidades: number;
   unidadesPorCategoria: Record<string, number>;
-  medicamentosEnRiesgo: Medicamento[];
-  proximosACaducar: Medicamento[];
-  caducados: Medicamento[];
+  unidadesPorBodega: Record<string, number>;
+  medicamentosEnRiesgo: MedEnRiesgo[];
+  lotesProximosACaducar: Lote[];
+  lotesCaducados: Lote[];
 }
-
-export type TipoMovimiento = "entrada" | "salida";
 
 export interface ResultadoMovimiento {
   movimientoId: string;
-  medicamento: Medicamento;
+  lote: Lote;
+  stockTotalMedicamento: number;
   bajoStock: boolean;
 }
 
@@ -34,18 +58,19 @@ export interface RespuestaAsistente {
   modo: string;
 }
 
-// --- Mapeo snake_case (API) → camelCase (TS) ---
-
 function aMedicamento(m: any): Medicamento {
   return {
-    id: m.id,
-    sku: m.sku,
-    nombre: m.nombre,
-    categoria: m.categoria,
-    fechaCaducidad: m.fecha_caducidad,
-    stockActual: m.stock_actual,
-    stockMinimo: m.stock_minimo,
-    bajoStock: m.bajo_stock,
+    id: m.id, sku: m.sku, nombre: m.nombre, categoria: m.categoria,
+    stockMinimo: m.stock_minimo, stockTotal: m.stock_total,
+    numLotes: m.num_lotes, bajoStock: m.bajo_stock,
+  };
+}
+
+function aLote(l: any): Lote {
+  return {
+    id: l.id, medicamentoId: l.medicamento_id, numeroLote: l.numero_lote,
+    bodegaCodigo: l.bodega_codigo, fechaCaducidad: l.fecha_caducidad,
+    stockActual: l.stock_actual,
   };
 }
 
@@ -62,78 +87,77 @@ async function pedir<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  async health(): Promise<{ status: string }> {
-    return pedir("/health");
+  async listarBodegas(): Promise<Bodega[]> {
+    const d = await pedir<any[]>("/warehouses");
+    return d.map((b) => ({ codigo: b.codigo, nombre: b.nombre, ubicacion: b.ubicacion }));
   },
 
   async listarMedicamentos(): Promise<Medicamento[]> {
-    const data = await pedir<any[]>("/medications");
-    return data.map(aMedicamento);
+    return (await pedir<any[]>("/medications")).map(aMedicamento);
   },
 
   async crearMedicamento(body: {
-    sku: string;
-    nombre: string;
-    categoria: string;
-    fechaCaducidad: string;
-    stockInicial: number;
-    stockMinimo: number;
+    sku: string; nombre: string; categoria: string; stockMinimo: number;
   }): Promise<Medicamento> {
-    const data = await pedir<any>("/medications", {
+    return aMedicamento(await pedir<any>("/medications", {
       method: "POST",
       body: JSON.stringify({
-        sku: body.sku,
-        nombre: body.nombre,
-        categoria: body.categoria,
-        fecha_caducidad: body.fechaCaducidad,
-        stock_inicial: body.stockInicial,
-        stock_minimo: body.stockMinimo,
+        sku: body.sku, nombre: body.nombre,
+        categoria: body.categoria, stock_minimo: body.stockMinimo,
       }),
-    });
-    return aMedicamento(data);
+    }));
   },
 
-  async registrarMovimiento(body: {
-    medicamentoId: string;
-    tipo: TipoMovimiento;
-    cantidad: number;
-    motivo?: string;
+  async listarLotes(bodega?: string): Promise<Lote[]> {
+    const q = bodega ? `?bodega=${encodeURIComponent(bodega)}` : "";
+    return (await pedir<any[]>(`/lots${q}`)).map(aLote);
+  },
+
+  async registrarEntrada(body: {
+    medicamentoId: string; numeroLote: string; bodegaCodigo: string;
+    fechaCaducidad: string; cantidad: number;
   }): Promise<ResultadoMovimiento> {
-    const data = await pedir<any>("/inventory/movements", {
+    const d = await pedir<any>("/inventory/entries", {
       method: "POST",
       body: JSON.stringify({
-        medicamento_id: body.medicamentoId,
-        tipo: body.tipo,
+        medicamento_id: body.medicamentoId, numero_lote: body.numeroLote,
+        bodega_codigo: body.bodegaCodigo, fecha_caducidad: body.fechaCaducidad,
         cantidad: body.cantidad,
-        motivo: body.motivo ?? null,
       }),
     });
-    return {
-      movimientoId: data.movimiento_id,
-      medicamento: aMedicamento(data.medicamento),
-      bajoStock: data.bajo_stock,
-    };
+    return { movimientoId: d.movimiento_id, lote: aLote(d.lote), stockTotalMedicamento: d.stock_total_medicamento, bajoStock: d.bajo_stock };
+  },
+
+  async registrarSalida(body: { loteId: string; cantidad: number }): Promise<ResultadoMovimiento> {
+    const d = await pedir<any>("/inventory/exits", {
+      method: "POST",
+      body: JSON.stringify({ lote_id: body.loteId, cantidad: body.cantidad }),
+    });
+    return { movimientoId: d.movimiento_id, lote: aLote(d.lote), stockTotalMedicamento: d.stock_total_medicamento, bajoStock: d.bajo_stock };
   },
 
   async alertasRestock(): Promise<Medicamento[]> {
-    const data = await pedir<any[]>("/alerts/restock");
-    return data.map(aMedicamento);
+    return (await pedir<any[]>("/alerts/restock")).map(aMedicamento);
   },
 
-  async alertasCaducidad(): Promise<Medicamento[]> {
-    const data = await pedir<any[]>("/alerts/expiring");
-    return data.map(aMedicamento);
+  async alertasCaducidad(): Promise<Lote[]> {
+    return (await pedir<any[]>("/alerts/expiring")).map(aLote);
   },
 
   async reporte(): Promise<Reporte> {
     const r = await pedir<any>("/reports/inventory");
     return {
       totalMedicamentos: r.total_medicamentos,
+      totalLotes: r.total_lotes,
       totalUnidades: r.total_unidades,
       unidadesPorCategoria: r.unidades_por_categoria,
-      medicamentosEnRiesgo: (r.medicamentos_en_riesgo ?? []).map(aMedicamento),
-      proximosACaducar: (r.proximos_a_caducar ?? []).map(aMedicamento),
-      caducados: (r.caducados ?? []).map(aMedicamento),
+      unidadesPorBodega: r.unidades_por_bodega,
+      medicamentosEnRiesgo: (r.medicamentos_en_riesgo ?? []).map((x: any) => ({
+        sku: x.sku, nombre: x.nombre, categoria: x.categoria,
+        stockTotal: x.stock_total, stockMinimo: x.stock_minimo,
+      })),
+      lotesProximosACaducar: (r.lotes_proximos_a_caducar ?? []).map(aLote),
+      lotesCaducados: (r.lotes_caducados ?? []).map(aLote),
     };
   },
 
