@@ -52,7 +52,7 @@ _SINONIMOS = {
 }
 
 _TERMINOS_DURACION = {"durar", "ultimo", "último", "lejano", "tarde"}
-_TERMINOS_CADUCIDAD = {"caducar", "caducidad", "caducado", "proximo", "próximo"}
+_TERMINOS_CADUCIDAD = {"caducar", "caducidad", "caducado", "proximo", "próximo", "pronto"}
 _TERMINOS_STOCK = {"reabastecer", "reabastecimiento", "stock", "bajo", "minimo", "mínimo"}
 _TERMINOS_DISPONIBILIDAD = {
     "tenemos", "tiene", "tengo", "disponible", "disponibles",
@@ -62,7 +62,12 @@ _TERMINOS_BODEGA = {"bodega", "bodegas"}
 
 
 def _normalizar(token: str) -> str:
-    return _SINONIMOS.get(token, token)
+    if token in _SINONIMOS:
+        return _SINONIMOS[token]
+    # Cualquier forma verbal de caducar/vencer/expirar -> 'caducar'.
+    if token.startswith(("caduc", "venc", "expir")):
+        return "caducar"
+    return token
 
 
 def _tokenizar(texto: str) -> list[str]:
