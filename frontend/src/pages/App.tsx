@@ -45,7 +45,7 @@ function Login({ onLogin }: { onLogin: () => void }) {
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
       <form onSubmit={enviar} className="bg-white rounded-xl shadow-lg p-8 w-full max-w-sm space-y-4">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-slate-800">💊 SmartStock AI</h1>
+          <h1 className="text-2xl font-bold text-slate-800">SmartStock AI</h1>
           <p className="text-sm text-slate-500">Inventario de farmacia</p>
         </div>
         <div>
@@ -122,7 +122,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     <div className="min-h-screen bg-slate-100 text-slate-800">
       <header className="bg-slate-900 text-white px-6 py-4 shadow">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <h1 className="text-xl font-bold">💊 SmartStock AI — Inventario de Farmacia</h1>
+          <h1 className="text-xl font-bold">SmartStock AI — Inventario de Farmacia</h1>
           <div className="flex items-center gap-2">
             <button
               onClick={refrescar}
@@ -380,7 +380,7 @@ function FormSalida({ lotes, medicamentos, onHecho }: { lotes: Lote[]; medicamen
     setMsg(null); setErr(null);
     try {
       const r = await api.registrarSalida({ loteId, cantidad });
-      setMsg(`Salida registrada. Stock total: ${r.stockTotalMedicamento}${r.bajoStock ? " ⚠️ bajo stock" : ""}`);
+      setMsg(`Salida registrada. Stock total: ${r.stockTotalMedicamento}${r.bajoStock ? " - bajo stock" : ""}`);
       onHecho();
     } catch (e) { setErr((e as Error).message); }
   }
@@ -408,7 +408,7 @@ function FormSalida({ lotes, medicamentos, onHecho }: { lotes: Lote[]; medicamen
 function PanelRestock({ alertas }: { alertas: Medicamento[] }) {
   return (
     <Tarjeta titulo={`Reabastecimiento (${alertas.length})`}>
-      {alertas.length === 0 ? <p className="text-sm text-slate-400">Sin alertas 🎉</p> : (
+      {alertas.length === 0 ? <p className="text-sm text-slate-400">Sin alertas</p> : (
         <ul className="space-y-2">
           {alertas.map((m) => (
             <li key={m.id} className="flex justify-between items-center bg-red-50 border border-red-200 rounded px-3 py-2">
@@ -431,7 +431,7 @@ function PanelRestock({ alertas }: { alertas: Medicamento[] }) {
 function PanelCaducidad({ lotes, nombreMed }: { lotes: Lote[]; nombreMed: (id: string) => Medicamento | undefined }) {
   return (
     <Tarjeta titulo={`Próximos a caducar (${lotes.length})`}>
-      {lotes.length === 0 ? <p className="text-sm text-slate-400">Sin alertas 🎉</p> : (
+      {lotes.length === 0 ? <p className="text-sm text-slate-400">Sin alertas</p> : (
         <ul className="space-y-2">
           {lotes.map((l) => (
             <li key={l.id} className="flex justify-between items-center bg-amber-50 border border-amber-200 rounded px-3 py-2">
@@ -468,7 +468,7 @@ function Asistente() {
   }
 
   return (
-    <Tarjeta titulo="🤖 Asistente">
+    <Tarjeta titulo="Asistente">
       <form onSubmit={preguntar} className="space-y-2">
         <textarea
           value={pregunta}

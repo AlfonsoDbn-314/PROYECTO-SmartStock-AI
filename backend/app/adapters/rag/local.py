@@ -196,7 +196,7 @@ class AsistenteLocal(Asistente):
             return None
         en_riesgo = [m for m in snap.medicamentos if esta_en_bajo_stock(m, self._lotes_por_med(snap, m.id))]
         if not en_riesgo:
-            cuerpo = "Ningún medicamento está por debajo de su stock mínimo. 🎉"
+            cuerpo = "Ningún medicamento está por debajo de su stock mínimo."
         else:
             detalle = "\n".join(
                 f"- {m.nombre} ({m.sku}): {stock_total(self._lotes_por_med(snap, m.id))} uds "
