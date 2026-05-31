@@ -92,6 +92,16 @@ def test_ventana_y_rango_temporal(tmp_path) -> None:
     assert "L-A" not in rango.respuesta and "L-C" not in rango.respuesta
 
 
+def test_seguimiento_donde_estan(tmp_path) -> None:
+    a = AsistenteLocal(_vault(tmp_path), proveedor_inventario=_snapshot)
+    # Primera consulta fija el contexto (lotes próximos a caducar).
+    a.consultar("¿qué caduca pronto?")
+    # Pregunta de seguimiento sin sujeto explícito.
+    r = a.consultar("¿dónde están?")
+    assert r.fuentes == ["inventario"]
+    assert "BOD-CENTRAL" in r.respuesta and "Ubicación" in r.respuesta
+
+
 def test_pregunta_por_bodega(tmp_path) -> None:
     a = AsistenteLocal(_vault(tmp_path), proveedor_inventario=_snapshot)
     r = a.consultar("¿qué hay en la bodega central?")

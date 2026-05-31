@@ -59,6 +59,10 @@ _TERMINOS_DISPONIBILIDAD = {
     "existe", "queda", "quedan", "contamos", "dispone",
 }
 _TERMINOS_BODEGA = {"bodega", "bodegas"}
+_TERMINOS_UBICACION = {
+    "donde", "dónde", "ubicacion", "ubicación", "ubicado", "ubicados",
+    "ubican", "lugar", "localizacion", "localización",
+}
 
 
 def _normalizar(token: str) -> str:
@@ -143,7 +147,12 @@ class AsistenteLocal(Asistente):
         self._ruta = Path(ruta_vault)
         self._inventario = proveedor_inventario or (lambda: InventarioSnapshot())
         self._fragmentos: list[_Fragmento] = []
+        # Memoria de contexto: lotes de la última respuesta (preguntas de seguimiento).
+        self._contexto: list[Lote] = []
         self.ingerir()
+
+    def _recordar(self, lotes: list[Lote]) -> None:
+        self._contexto = list(lotes)
 
     # --- Indexación del vault ---------------------------------------------
 
@@ -199,6 +208,7 @@ class AsistenteLocal(Asistente):
         if not vigentes:
             return None
         lejano = max(vigentes, key=lambda l: l.fecha_caducidad)
+        self._recordar([lejano])
         cuerpo = (
             "El lote que durará más tiempo (caduca más tarde) es:\n"
             f"- {self._linea_lote(snap, lejano, hoy)}"
@@ -215,6 +225,7 @@ class AsistenteLocal(Asistente):
             ],
             key=lambda l: l.fecha_caducidad,
         )
+        self._recordar(en_rango)
         if not en_rango:
             cuerpo = f"Ningún lote caduca entre {etiqueta}."
         else:
@@ -226,6 +237,7 @@ class AsistenteLocal(Asistente):
         if not snap.lotes:
             return None
         en_ventana = lotes_proximos_a_caducar(snap.lotes, hoy, dias_window)
+        self._recordar(en_ventana)
         if not en_ventana:
             cuerpo = f"Ningún lote caduca en los próximos {etiqueta}."
         else:
@@ -241,6 +253,7 @@ class AsistenteLocal(Asistente):
             key=lambda l: l.fecha_caducidad,
         )
         caducados = [l for l in snap.lotes if esta_caducado(l, hoy)]
+        self._recordar(lotes_proximos_a_caducar(snap.lotes, hoy) + caducados)
         partes: list[str] = []
         if vigentes:
             partes.append(
@@ -274,11 +287,14 @@ class AsistenteLocal(Asistente):
         meds = self._buscar_medicamentos(snap, tokens)
         if meds:
             bloques = []
+            todos: list[Lote] = []
             for m in meds:
                 lotes = self._lotes_por_med(snap, m.id)
+                todos.extend(lotes)
                 total = stock_total(lotes)
                 det = "\n".join("    · " + self._linea_lote(snap, l, hoy) for l in lotes) or "    (sin lotes)"
                 bloques.append(f"- {m.nombre} ({m.sku}): {total} uds en total\n{det}")
+            self._recordar(todos)
             return RespuestaAsistente("Sí, está en el inventario:\n" + "\n".join(bloques), fuentes=["inventario"], modo="local")
         termino = " ".join(sorted(tokens - _TERMINOS_DISPONIBILIDAD - _TERMINOS_BODEGA)) or "ese medicamento"
         return RespuestaAsistente(f"No, no tenemos «{termino}» en el inventario actualmente.", fuentes=["inventario"], modo="local")
@@ -309,8 +325,32 @@ class AsistenteLocal(Asistente):
             resumen = "\n".join(f"- {b.codigo}: {b.nombre} ({b.ubicacion})" for b in snap.bodegas)
             return RespuestaAsistente(f"Bodegas registradas:\n{resumen}", fuentes=["inventario"], modo="local")
         lotes = [l for l in snap.lotes if l.bodega_codigo == objetivo.codigo]
+        self._recordar(lotes)
         detalle = "\n".join("- " + self._linea_lote(snap, l, hoy) for l in lotes) or "(sin lotes)"
         return RespuestaAsistente(f"Lotes en {objetivo.nombre} ({objetivo.codigo}):\n{detalle}", fuentes=["inventario"], modo="local")
+
+    def _responder_ubicacion(self, snap, tokens, hoy) -> RespuestaAsistente | None:
+        """¿Dónde están? Usa el medicamento citado o, si no, el contexto previo."""
+        meds = self._buscar_medicamentos(snap, tokens)
+        if meds:
+            lotes = [l for m in meds for l in self._lotes_por_med(snap, m.id)]
+        else:
+            lotes = self._contexto
+        if not lotes:
+            return None
+        nombre_bod = {b.codigo: b.nombre for b in snap.bodegas}
+        por_bodega: dict[str, list[Lote]] = {}
+        for l in lotes:
+            por_bodega.setdefault(l.bodega_codigo, []).append(l)
+        bloques = []
+        for cod, ls in por_bodega.items():
+            det = "\n".join(
+                f"    · {self._nombre_med(snap, l.medicamento_id)} · lote {l.numero_lote} "
+                f"· {l.stock_actual} uds"
+                for l in ls
+            )
+            bloques.append(f"- {nombre_bod.get(cod, cod)} ({cod}):\n{det}")
+        return RespuestaAsistente("Ubicación:\n" + "\n".join(bloques), fuentes=["inventario"], modo="local")
 
     # --- Punto de entrada --------------------------------------------------
 
@@ -331,6 +371,11 @@ class AsistenteLocal(Asistente):
         if ventana is not None:
             dias_window, etiqueta = ventana
             if (r := self._responder_ventana(snap, hoy, dias_window, etiqueta)) is not None:
+                return r
+
+        # Seguimiento: "¿dónde están?" sobre el resultado anterior (o un medicamento).
+        if tokens & _TERMINOS_UBICACION:
+            if (r := self._responder_ubicacion(snap, tokens, hoy)) is not None:
                 return r
 
         if tokens & _TERMINOS_DURACION:
