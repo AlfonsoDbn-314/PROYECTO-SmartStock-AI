@@ -11,6 +11,13 @@ class Settings(BaseSettings):
     # Cargar medicamentos de ejemplo al arrancar (paso 4 del MVP).
     cargar_semilla: bool = True
 
+    # --- Autenticación (login sencillo) ---
+    auth_enabled: bool = True
+    auth_username: str = "admin"
+    auth_password: str = "admin123"
+    auth_secret: str = "cambia-esta-clave-secreta-en-produccion"
+    auth_token_ttl: int = 60 * 60 * 8  # 8 horas, en segundos
+
     # --- Asistente / Ollama ---
     # Si está activo y Ollama responde, se usa el LLM real; si no, modo local.
     ollama_enabled: bool = True

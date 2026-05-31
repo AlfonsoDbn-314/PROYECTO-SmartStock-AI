@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import {
   api,
+  setOnUnauthorized,
   type Bodega,
   type Lote,
   type Medicamento,
@@ -8,6 +9,67 @@ import {
 } from "../lib/api";
 
 export default function App() {
+  const [autenticado, setAutenticado] = useState(api.estaAutenticado());
+
+  useEffect(() => {
+    setOnUnauthorized(() => setAutenticado(false));
+  }, []);
+
+  if (!autenticado) {
+    return <Login onLogin={() => setAutenticado(true)} />;
+  }
+  return <Dashboard onLogout={() => { api.logout(); setAutenticado(false); }} />;
+}
+
+function Login({ onLogin }: { onLogin: () => void }) {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [cargando, setCargando] = useState(false);
+
+  async function enviar(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setCargando(true);
+    try {
+      await api.login(username, password);
+      onLogin();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setCargando(false);
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+      <form onSubmit={enviar} className="bg-white rounded-xl shadow-lg p-8 w-full max-w-sm space-y-4">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-slate-800">💊 SmartStock AI</h1>
+          <p className="text-sm text-slate-500">Inventario de farmacia</p>
+        </div>
+        <div>
+          <label className="block text-sm text-slate-600 mb-1">Usuario</label>
+          <input value={username} onChange={(e) => setUsername(e.target.value)} required
+            className="w-full border rounded px-3 py-2" autoFocus />
+        </div>
+        <div>
+          <label className="block text-sm text-slate-600 mb-1">Contraseña</label>
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required
+            className="w-full border rounded px-3 py-2" />
+        </div>
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        <button type="submit" disabled={cargando}
+          className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded py-2">
+          {cargando ? "Entrando…" : "Iniciar sesión"}
+        </button>
+        <p className="text-xs text-slate-400 text-center">Demo: admin / admin123</p>
+      </form>
+    </div>
+  );
+}
+
+function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [bodegas, setBodegas] = useState<Bodega[]>([]);
   const [medicamentos, setMedicamentos] = useState<Medicamento[]>([]);
   const [lotes, setLotes] = useState<Lote[]>([]);
@@ -61,12 +123,20 @@ export default function App() {
       <header className="bg-slate-900 text-white px-6 py-4 shadow">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <h1 className="text-xl font-bold">💊 SmartStock AI — Inventario de Farmacia</h1>
-          <button
-            onClick={refrescar}
-            className="text-sm bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded"
-          >
-            {cargando ? "Actualizando…" : "Refrescar"}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={refrescar}
+              className="text-sm bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded"
+            >
+              {cargando ? "Actualizando…" : "Refrescar"}
+            </button>
+            <button
+              onClick={onLogout}
+              className="text-sm bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded"
+            >
+              Salir
+            </button>
+          </div>
         </div>
       </header>
 

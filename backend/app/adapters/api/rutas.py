@@ -33,15 +33,9 @@ from .schemas import (
     RegistrarSalidaIn,
     ReporteInventarioOut,
     RespuestaAsistenteOut,
-    SaludOut,
 )
 
 router = APIRouter()
-
-
-@router.get("/health", response_model=SaludOut, tags=["salud"])
-def health() -> SaludOut:
-    return SaludOut(status="ok")
 
 
 # --- Bodegas ---------------------------------------------------------------

@@ -19,6 +19,7 @@ def client(monkeypatch) -> TestClient:
     monkeypatch.setattr(deps, "_repositorio", repo)
     monkeypatch.setattr("app.config.settings.settings.cargar_semilla", False)
     monkeypatch.setattr("app.config.settings.settings.ollama_enabled", False)
+    monkeypatch.setattr("app.config.settings.settings.auth_enabled", False)
     app = crear_app()
     with TestClient(app) as c:
         yield c

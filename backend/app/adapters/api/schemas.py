@@ -163,6 +163,23 @@ class IngestaOut(BaseModel):
     documentos_indexados: int
 
 
+# --- Auth ------------------------------------------------------------------
+
+class LoginIn(BaseModel):
+    username: str = Field(..., examples=["admin"])
+    password: str = Field(..., examples=["admin123"])
+
+
+class TokenOut(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int
+
+
+class UsuarioOut(BaseModel):
+    username: str
+
+
 # --- Salud -----------------------------------------------------------------
 
 class SaludOut(BaseModel):

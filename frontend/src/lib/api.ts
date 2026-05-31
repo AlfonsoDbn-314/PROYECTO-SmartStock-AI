@@ -74,11 +74,33 @@ function aLote(l: any): Lote {
   };
 }
 
+// --- Token de sesión ---
+const TOKEN_KEY = "smartstock_token";
+let token: string | null = localStorage.getItem(TOKEN_KEY);
+let onUnauthorized: (() => void) | null = null;
+
+export function setOnUnauthorized(cb: () => void) {
+  onUnauthorized = cb;
+}
+
+function setToken(t: string | null) {
+  token = t;
+  if (t) localStorage.setItem(TOKEN_KEY, t);
+  else localStorage.removeItem(TOKEN_KEY);
+}
+
 async function pedir<T>(url: string, init?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
   const res = await fetch(`/api${url}`, {
-    headers: { "Content-Type": "application/json" },
     ...init,
+    headers: { ...headers, ...(init?.headers as Record<string, string>) },
   });
+  if (res.status === 401) {
+    setToken(null);
+    if (onUnauthorized) onUnauthorized();
+    throw new Error("Sesión expirada o no autenticado.");
+  }
   if (!res.ok) {
     const cuerpo = await res.json().catch(() => ({}));
     throw new Error(cuerpo.detail ?? `Error ${res.status}`);
@@ -87,6 +109,28 @@ async function pedir<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  estaAutenticado(): boolean {
+    return token !== null;
+  },
+
+  async login(username: string, password: string): Promise<void> {
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
+    if (!res.ok) {
+      const cuerpo = await res.json().catch(() => ({}));
+      throw new Error(cuerpo.detail ?? "No se pudo iniciar sesión.");
+    }
+    const data = await res.json();
+    setToken(data.access_token);
+  },
+
+  logout(): void {
+    setToken(null);
+  },
+
   async listarBodegas(): Promise<Bodega[]> {
     const d = await pedir<any[]>("/warehouses");
     return d.map((b) => ({ codigo: b.codigo, nombre: b.nombre, ubicacion: b.ubicacion }));
