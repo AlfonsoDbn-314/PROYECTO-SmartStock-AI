@@ -66,6 +66,32 @@ def test_pregunta_en_riesgo(tmp_path) -> None:
     assert "mínimo" in r.respuesta.lower()
 
 
+def test_ventana_y_rango_temporal(tmp_path) -> None:
+    from datetime import date, timedelta
+    from app.adapters.rag.local import InventarioSnapshot
+    from app.domain.entities import Bodega, Lote, Medicamento
+
+    hoy = date.today()
+    med = Medicamento("m1", "MED-X", "X", "Cat", 5)
+    snap = InventarioSnapshot(
+        medicamentos=[med],
+        bodegas=[Bodega("BOD", "B", "u")],
+        lotes=[
+            Lote("a", "m1", "L-A", "BOD", hoy + timedelta(days=20), 5),   # ~menos de 1 mes
+            Lote("b", "m1", "L-B", "BOD", hoy + timedelta(days=120), 5),  # ~4 meses
+            Lote("c", "m1", "L-C", "BOD", hoy + timedelta(days=300), 5),  # ~10 meses
+        ],
+    )
+    a = AsistenteLocal(_vault(tmp_path), proveedor_inventario=lambda: snap)
+
+    menos = a.consultar("¿qué se vence en menos de 2 meses?")
+    assert "L-A" in menos.respuesta and "L-B" not in menos.respuesta
+
+    rango = a.consultar("¿qué se vence entre 3 y 5 meses?")
+    assert "L-B" in rango.respuesta
+    assert "L-A" not in rango.respuesta and "L-C" not in rango.respuesta
+
+
 def test_pregunta_por_bodega(tmp_path) -> None:
     a = AsistenteLocal(_vault(tmp_path), proveedor_inventario=_snapshot)
     r = a.consultar("¿qué hay en la bodega central?")

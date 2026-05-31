@@ -74,6 +74,43 @@ def _tokenizar(texto: str) -> list[str]:
     return [_normalizar(t.lower()) for t in _PALABRA.findall(texto) if t.lower() not in _VACIAS]
 
 
+_UNIDAD = r"(mes|meses|seman|d[ií]a|a[nñ]o|anio)"
+_RANGO_RE = re.compile(r"(\d+)\s*(?:y|a|-|hasta)\s*(\d+)\s*" + _UNIDAD, re.IGNORECASE)
+_VENTANA_RE = re.compile(r"(\d+)\s*" + _UNIDAD, re.IGNORECASE)
+
+
+def _factor_unidad(raiz: str, plural: bool) -> tuple[int, str]:
+    raiz = raiz.lower()
+    if raiz.startswith("mes"):
+        return 30, "meses" if plural else "mes"
+    if raiz.startswith("seman"):
+        return 7, "semanas" if plural else "semana"
+    if raiz.startswith(("a\u00f1o", "ano", "anio")):
+        return 365, "a\u00f1os" if plural else "a\u00f1o"
+    return 1, "d\u00edas" if plural else "d\u00eda"
+
+
+def _parsear_rango(pregunta: str) -> tuple[int, int, str] | None:
+    """Extrae un rango temporal: (dias_min, dias_max, etiqueta). Ej. 'entre 3 y 5 meses'."""
+    m = _RANGO_RE.search(pregunta.lower())
+    if not m:
+        return None
+    a, b = int(m.group(1)), int(m.group(2))
+    factor, unidad = _factor_unidad(m.group(3), plural=max(a, b) != 1)
+    lo, hi = sorted((a, b))
+    return lo * factor, hi * factor, f"{lo} y {hi} {unidad}"
+
+
+def _parsear_ventana(pregunta: str) -> tuple[int, str] | None:
+    """Extrae una ventana temporal del texto: (dias, etiqueta). Ej. '3 meses'->(90,'3 meses')."""
+    m = _VENTANA_RE.search(pregunta.lower())
+    if not m:
+        return None
+    n = int(m.group(1))
+    factor, unidad = _factor_unidad(m.group(2), plural=n != 1)
+    return n * factor, f"{n} {unidad}"
+
+
 def _meses(dias: int) -> int:
     """Aproxima días a meses (30 días/mes)."""
     return round(abs(dias) / 30)
@@ -168,6 +205,34 @@ class AsistenteLocal(Asistente):
         )
         return RespuestaAsistente(cuerpo, fuentes=["inventario"], modo="local")
 
+    def _responder_rango(self, snap, hoy, dias_min, dias_max, etiqueta) -> RespuestaAsistente | None:
+        if not snap.lotes:
+            return None
+        en_rango = sorted(
+            [
+                l for l in snap.lotes
+                if dias_min <= dias_para_caducar(l, hoy) <= dias_max
+            ],
+            key=lambda l: l.fecha_caducidad,
+        )
+        if not en_rango:
+            cuerpo = f"Ningún lote caduca entre {etiqueta}."
+        else:
+            detalle = "\n".join("- " + self._linea_lote(snap, l, hoy) for l in en_rango)
+            cuerpo = f"Lotes que caducan entre {etiqueta}:\n{detalle}"
+        return RespuestaAsistente(cuerpo, fuentes=["inventario"], modo="local")
+
+    def _responder_ventana(self, snap, hoy, dias_window, etiqueta) -> RespuestaAsistente | None:
+        if not snap.lotes:
+            return None
+        en_ventana = lotes_proximos_a_caducar(snap.lotes, hoy, dias_window)
+        if not en_ventana:
+            cuerpo = f"Ningún lote caduca en los próximos {etiqueta}."
+        else:
+            detalle = "\n".join("- " + self._linea_lote(snap, l, hoy) for l in en_ventana)
+            cuerpo = f"Lotes que caducan en menos de {etiqueta}:\n{detalle}"
+        return RespuestaAsistente(cuerpo, fuentes=["inventario"], modo="local")
+
     def _responder_caducidad(self, snap: InventarioSnapshot, hoy: date) -> RespuestaAsistente | None:
         if not snap.lotes:
             return None
@@ -253,6 +318,20 @@ class AsistenteLocal(Asistente):
         hoy = date.today()
         snap = self._inventario()
         tokens = set(_tokenizar(pregunta))
+
+        # Rango temporal: "entre 3 y 5 meses", "de 2 a 4 semanas"...
+        rango = _parsear_rango(pregunta)
+        if rango is not None:
+            lo, hi, etiqueta = rango
+            if (r := self._responder_rango(snap, hoy, lo, hi, etiqueta)) is not None:
+                return r
+
+        # Ventana temporal explícita: "en menos de 3 meses", "próximas 2 semanas"...
+        ventana = _parsear_ventana(pregunta)
+        if ventana is not None:
+            dias_window, etiqueta = ventana
+            if (r := self._responder_ventana(snap, hoy, dias_window, etiqueta)) is not None:
+                return r
 
         if tokens & _TERMINOS_DURACION:
             if (r := self._responder_duracion(snap, hoy)) is not None:
